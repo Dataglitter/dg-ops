@@ -1,0 +1,41 @@
+Description: Hosting a website with bucket for static assets
+Parameters:
+  AssetsBucketName:
+    Description: BucketName to host the assets
+    Type: String
+Resources:
+  AssetsS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: PublicRead
+      CorsConfiguration:
+        CorsRules:
+          - AllowedMethods:
+              - GET
+            AllowedOrigins:
+              - '*'
+            AllowedHeaders:
+              - '*'
+            MaxAge: 3000
+      BucketName: !Ref AssetsBucketName
+    DeletionPolicy: Retain
+  AssetsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      PolicyDocument:
+        Id: AssetsS3BucketPolicy
+        Version: 2012-10-17
+        Statement:
+          - Sid: PublicReadForGetBucketObjects
+            Effect: Allow
+            Principal:
+              AWS:
+                - '*'
+            Action: 's3:GetObject'
+            Resource: !Join
+              - ''
+              - - 'arn:aws:s3:::'
+                - !Ref AssetsS3Bucket
+                - /*
+      Bucket: !Ref AssetsS3Bucket
+

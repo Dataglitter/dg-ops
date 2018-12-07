@@ -1,0 +1,143 @@
+Description: Task definitions and Service to be run in the cluster
+Parameters:
+  ECSCluster:
+    Type: String
+    Description: Which ECS cluster to deploy into?
+  CloudwatchLogsGroup:
+    Type: String
+    Description: Cloudwatch logs group, where the logs are being stored
+  MongoDbImage:
+    Type: String
+    Description: Mongo db image:tag
+  PostServiceImage:
+    Type: String
+    Description: Post service image:tag
+  FrontEndImage:
+    Type: String
+    Description: Front End image:tag
+  KeyStorePassword:
+    Type: String
+    Description: Key store password for the postservice certificate
+  KeyPassword:
+    Type: String
+    Description: Key password for the postservice certificate
+  JwtSecret:
+    Type: String
+    Description: JWT secret key
+Resources:
+  taskdefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Join ['', [!Ref 'AWS::StackName', -task-definition]]
+      ContainerDefinitions:
+      - Name: mongo
+        # Cpu: '512'
+        Essential: 'true'
+        Hostname: mongo
+        Image: !Ref 'MongoDbImage'
+        Memory: '1024'
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group: !Ref 'CloudwatchLogsGroup'
+            awslogs-region: !Ref 'AWS::Region'
+            awslogs-stream-prefix: !Join ['-', [!Ref 'AWS::StackName', mongo, ecs]]
+        MountPoints:
+        - ContainerPath: /home/app/data
+          SourceVolume: data
+        PortMappings:
+        - ContainerPort: 27017
+          HostPort: 27017
+        HealthCheck:
+          Command:
+            - CMD-SHELL
+            - echo 'db.stats().ok' | mongo localhost:27017/dataglitter --quiet
+          Interval: 30
+          Retries: 5
+          StartPeriod: 120
+          Timeout: 5
+      - Name: postservice
+        # Cpu: '512'
+        Essential: 'false'
+        Hostname: postservice
+        Image: !Ref 'PostServiceImage'
+        Memory: '1024'
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group: !Ref 'CloudwatchLogsGroup'
+            awslogs-region: !Ref 'AWS::Region'
+            awslogs-stream-prefix: !Join ['-', [!Ref 'AWS::StackName', postservice, ecs]]
+        Links:
+         - mongo
+        Environment:
+        - Name: MONGO
+          Value: mongo
+        - Name: KEY_STORE_PASSWORD
+          Value: !Ref 'KeyStorePassword'
+        - Name: KEY_PASSWORD
+          Value: !Ref 'KeyPassword'
+        - Name: JWT_SECRET
+          Value: !Ref 'JwtSecret'
+        PortMappings:
+        - ContainerPort: 8443
+          HostPort: 11012
+        HealthCheck:
+          Command:
+            - CMD-SHELL
+            - curl https://localhost:8443/api/health --insecure || exit 1
+          Interval: 30
+          Retries: 5
+          StartPeriod: 120
+          Timeout: 5
+      - Name: frontend
+        # Cpu: '512'
+        Essential: 'true'
+        Hostname: frontend
+        Image: !Ref 'FrontEndImage'
+        Memory: '512'
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group: !Ref 'CloudwatchLogsGroup'
+            awslogs-region: !Ref 'AWS::Region'
+            awslogs-stream-prefix: !Join ['-', [!Ref 'AWS::StackName', frontend, ecs]]
+        Links:
+         - postservice
+        PortMappings:
+        - ContainerPort: 443
+          HostPort: 443
+        - ContainerPort: 80
+          HostPort: 80
+        HealthCheck:
+          Command:
+            - CMD-SHELL
+            - curl https://localhost/credits --insecure || exit 1
+          Interval: 30
+          Retries: 5
+          StartPeriod: 120
+          Timeout: 5
+      NetworkMode: bridge
+      Volumes:
+      - Name: data
+        DockerVolumeConfiguration:
+          Driver: cloudstor:aws
+          Autoprovision: true
+          DriverOpts:
+            size : 30
+            ebstype: gp2
+          Labels:
+            storage: mongodb
+          Scope: shared
+  service:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref 'ECSCluster'
+      DesiredCount: '1'
+      TaskDefinition: !Ref 'taskdefinition'
+
+Outputs:
+  ecsservice:
+    Value: !Ref 'service'
+  taskdef:
+    Value: !Ref 'taskdefinition'

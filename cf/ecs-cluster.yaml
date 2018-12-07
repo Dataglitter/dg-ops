@@ -1,0 +1,216 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ECS cluster for Dataglitter (EC2+ASG+LC+SG+CWM+IAM)
+Parameters:
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the ECS instances.
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: Select a VPC that allows instances access to the Internet.
+  SubnetId:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Select at two subnets in your selected VPC.
+  DesiredCapacity:
+    Type: Number
+    Default: '1'
+    Description: Number of instances to launch in your ECS cluster.
+  MaxSize:
+    Type: Number
+    Default: '1'
+    Description: Maximum number of instances that can be launched in your ECS cluster.
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues: [t2.micro, t2.small, t2.medium, t2.large]
+    ConstraintDescription: Please choose a valid instance type.
+  AssetsS3Bucket:
+    Description: Assets S3 bucket
+    Type: String
+Mappings:
+  AWSRegionToAMI:
+    us-east-1:
+      AMIID: ami-eca289fb
+    us-east-2:
+      AMIID: ami-446f3521
+    us-west-1:
+      AMIID: ami-9fadf8ff
+    us-west-2:
+      AMIID: ami-7abc111a
+    eu-west-1:
+      AMIID: ami-39d530d4
+    eu-central-1:
+      AMIID: ami-54f5303b
+    ap-northeast-1:
+      AMIID: ami-9cd57ffd
+    ap-southeast-1:
+      AMIID: ami-a900a3ca
+    ap-southeast-2:
+      AMIID: ami-5781be34
+Resources:
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+  EcsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ECS Security Group
+      VpcId: !Ref 'VpcId'
+  EcsSecurityGroupHTTPinbound:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref 'EcsSecurityGroup'
+      IpProtocol: tcp
+      FromPort: '80'
+      ToPort: '80'
+      CidrIp: 0.0.0.0/0
+  EcsSecurityGroupHTTPSinbound:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref 'EcsSecurityGroup'
+      IpProtocol: tcp
+      FromPort: '443'
+      ToPort: '443'
+      CidrIp: 0.0.0.0/0
+  EcsSecurityGroupBackendinbound:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref 'EcsSecurityGroup'
+      IpProtocol: tcp
+      FromPort: '11012'
+      ToPort: '11012'
+      CidrIp: 0.0.0.0/0
+  EcsSecurityGroupMongoDBinbound:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref 'EcsSecurityGroup'
+      IpProtocol: tcp
+      FromPort: '27017'
+      ToPort: '27017'
+      CidrIp: 0.0.0.0/0
+  EcsSecurityGroupSSHinbound:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref 'EcsSecurityGroup'
+      IpProtocol: tcp
+      FromPort: '22'
+      ToPort: '22'
+      CidrIp: 0.0.0.0/0
+  ECSAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier: !Ref 'SubnetId'
+      LaunchConfigurationName: !Ref 'ContainerInstances'
+      MinSize: '1'
+      MaxSize: !Ref 'MaxSize'
+      DesiredCapacity: !Ref 'DesiredCapacity'
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15M
+    UpdatePolicy:
+      AutoScalingReplacingUpdate:
+        WillReplace: 'true'
+  ContainerInstances:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      ImageId: !FindInMap [AWSRegionToAMI, !Ref 'AWS::Region', AMIID]
+      SecurityGroups: [!Ref 'EcsSecurityGroup']
+      InstanceType: !Ref 'InstanceType'
+      IamInstanceProfile: !Ref 'EC2InstanceProfile'
+      KeyName: !Ref 'KeyName'
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          echo ECS_CLUSTER=${ECSCluster} >> /etc/ecs/ecs.config
+          yum install -y aws-cfn-bootstrap
+          yum update -y ecs-init
+          mkdir /dev/mqueue
+          docker plugin install --alias cloudstor:aws --grant-all-permissions docker4x/cloudstor:18.06.1-ce-aws1 CLOUD_PLATFORM=AWS AWS_REGION=${AWS::Region} EFS_SUPPORTED=0 DEBUG=1
+          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource ECSAutoScalingGroup --region ${AWS::Region}
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ec2.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+      - PolicyName: ecs-service-permissions
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action: [
+                'ecs:CreateCluster',
+                'ecs:DeregisterContainerInstance',
+                'ecs:DiscoverPollEndpoint',
+                'ecs:Poll',
+                'ecs:RegisterContainerInstance',
+                'ecs:StartTelemetrySession',
+                'ecs:Submit*',
+                'logs:CreateLogStream',
+                'logs:PutLogEvents'
+            ]
+            Resource: '*'
+      - PolicyName: ecs-s3-write-permissions
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action: [
+                's3:PutBucketPublicAccessBlock',
+                's3:PutMetricsConfiguration',
+                's3:PutReplicationConfiguration',
+                's3:PutObjectVersionTagging',
+                's3:DeleteBucketPolicy',
+                's3:PutBucketCORS',
+                's3:PutInventoryConfiguration',
+                's3:PutEncryptionConfiguration',
+                's3:PutBucketNotification',
+                's3:PutObject',
+                's3:ObjectOwnerOverrideToBucketOwner',
+                's3:PutBucketRequestPayment',
+                's3:PutBucketWebsite',
+                's3:PutBucketLogging',
+                's3:PutBucketTagging',
+                's3:PutLifecycleConfiguration',
+                's3:PutObjectVersionAcl',
+                's3:PutBucketAcl',
+                's3:PutBucketPolicy',
+                's3:PutObjectTagging',
+                's3:PutBucketVersioning',
+                's3:PutObjectAcl'
+            ]
+            Resource: !Join ['', ['arn:aws:s3:::', !Ref 'AssetsS3Bucket', '/*']]
+      - PolicyName: ecs-volume-permissions
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action: [
+                'ec2:CreateTags',
+                'ec2:CreateVolume',
+                'ec2:DetachVolume',
+                'ec2:AttachVolume',
+                'ec2:DeleteVolume',
+                'ec2:DescribeVolumes',
+                'ec2:DescribeVolumeStatus',
+                'ec2:CreateSnapshot',
+                'ec2:DeleteSnapshot',
+                'ec2:DescribeSnapshots'
+            ]
+            Resource: '*'
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles: [!Ref 'EC2Role']
+  CloudwatchLogsGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join ['-', [ECSLogGroup, !Ref 'AWS::StackName']]
+      RetentionInDays: 7
+Outputs:
+  ecscluster:
+    Value: !Ref 'ECSCluster'
+  CloudwatchLogsGroup:
+    Value: !Ref 'CloudwatchLogsGroup'
