@@ -24,11 +24,18 @@ Parameters:
   JwtSecret:
     Type: String
     Description: JWT secret key
+  DockerHubSecretARN:
+    Description: Docker hub Secret ARN
+    Type: String
+  ExecutionRoleARN:
+    Description: Execution role
+    Type: String
 Resources:
   taskdefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
       Family: !Join ['', [!Ref 'AWS::StackName', -task-definition]]
+      ExecutionRoleArn: !Ref 'ExecutionRoleARN'
       ContainerDefinitions:
       - Name: mongo
         # Cpu: '512'
@@ -92,7 +99,7 @@ Resources:
           Timeout: 5
       - Name: frontend
         # Cpu: '512'
-        Essential: 'true'
+        Essential: 'false'
         Hostname: frontend
         Image: !Ref 'FrontEndImage'
         Memory: '512'
@@ -117,6 +124,8 @@ Resources:
           Retries: 5
           StartPeriod: 120
           Timeout: 5
+        RepositoryCredentials:
+          CredentialsParameter: !Ref 'DockerHubSecretARN'
       NetworkMode: bridge
       Volumes:
       - Name: data

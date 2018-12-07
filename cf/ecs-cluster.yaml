@@ -27,6 +27,9 @@ Parameters:
   AssetsS3Bucket:
     Description: Assets S3 bucket
     Type: String
+  DockerHubSecretARN:
+    Description: Docker hub Secret ARN
+    Type: String
 Mappings:
   AWSRegionToAMI:
     us-east-1:
@@ -199,6 +202,14 @@ Resources:
                 'ec2:DescribeSnapshots'
             ]
             Resource: '*'
+      - PolicyName: ecs-dockerhub-cred
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action: [
+                'secretsmanager:GetSecretValue'
+            ]
+            Resource: !Ref 'DockerHubSecretARN'
   EC2InstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
