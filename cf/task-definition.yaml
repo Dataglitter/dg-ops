@@ -30,6 +30,15 @@ Parameters:
   ExecutionRoleARN:
     Description: Execution role
     Type: String
+  MongoMemory:
+    Description: Memory allocation for MongoDB
+    Type: String
+  PostServiceMemory:
+    Description: Memory allocation for post-service
+    Type: String
+  FrontEndMemory:
+    Description: Memory allocation for front end
+    Type: String
 Resources:
   taskdefinition:
     Type: AWS::ECS::TaskDefinition
@@ -42,7 +51,7 @@ Resources:
         Essential: 'true'
         Hostname: mongo
         Image: !Ref 'MongoDbImage'
-        Memory: '1024'
+        Memory: !Ref 'MongoMemory'
         LogConfiguration:
           LogDriver: awslogs
           Options:
@@ -68,7 +77,7 @@ Resources:
         Essential: 'false'
         Hostname: postservice
         Image: !Ref 'PostServiceImage'
-        Memory: '1024'
+        Memory: !Ref 'PostServiceMemory'
         LogConfiguration:
           LogDriver: awslogs
           Options:
@@ -102,7 +111,7 @@ Resources:
         Essential: 'false'
         Hostname: frontend
         Image: !Ref 'FrontEndImage'
-        Memory: '512'
+        Memory: !Ref 'FrontEndMemory'
         LogConfiguration:
           LogDriver: awslogs
           Options:
