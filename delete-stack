@@ -1,0 +1,13 @@
+#!/bin/sh
+
+if [ -z "$1" ]
+  then
+    echo "[ERROR] No argument supplied. Expected stack name for stack command execution"
+    exit 1
+fi
+
+aws cloudformation delete-stack \
+    --stack-name $1 \
+    --profile prod
+
+echo "[INFO] Stack sucessfully deleted '$1'"
