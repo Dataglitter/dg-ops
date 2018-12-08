@@ -82,14 +82,6 @@ Resources:
       FromPort: '11012'
       ToPort: '11012'
       CidrIp: 0.0.0.0/0
-  EcsSecurityGroupMongoDBinbound:
-    Type: AWS::EC2::SecurityGroupIngress
-    Properties:
-      GroupId: !Ref 'EcsSecurityGroup'
-      IpProtocol: tcp
-      FromPort: '27017'
-      ToPort: '27017'
-      CidrIp: 0.0.0.0/0
   EcsSecurityGroupSSHinbound:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
