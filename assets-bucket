@@ -1,0 +1,23 @@
+#!/bin/sh
+
+if [ -z "$1" ]
+  then
+    echo "[ERROR] No argument supplied. Expected either 'create' or 'update' for stack command execution"
+    exit 1
+fi
+
+if [ "$1" == 'create' ] || [ "$2" == 'update' ] ; then
+    echo "[INFO] Starting Execution. Creating S3 BUCKET"
+    DATAGLITTER_ASSETS_S3_BUCKET=${DATAGLITTER_ASSETS_S3_BUCKET:-assets}
+
+    aws cloudformation $1-stack \
+        --stack-name dataglitter-assets \
+        --template-body file://${PWD}/cf/assets-bucket-setup.yaml \
+        --parameters ParameterKey=AssetsBucketName,ParameterValue=$DATAGLITTER_ASSETS_S3_BUCKET \
+        --profile prod
+else
+    echo "[ERROR] Expected either 'create' or 'update' for stack command execution."
+    exit 1
+fi
+
+echo "[INFO] Sucessfully finished stack $1"

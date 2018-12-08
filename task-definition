@@ -1,0 +1,48 @@
+#!/bin/sh
+
+if [ -z "$1" ]
+  then
+    echo "[ERROR] No argument supplied. Expected either 'create' or 'update' for stack command execution"
+    exit 1
+fi
+
+if [ "$1" == 'create' ] || [ "$2" == 'update' ] ; then
+    echo "[INFO] Starting Execution. Creating a TASK DEFINITION"
+    ECS_CLUSTER=${ECS_CLUSTER:-ecscluster}  # Needs to be the created ECS cluster name
+    CLOUDWATCH_LOG_GROUP=${CLOUDWATCH_LOG_GROUP:-cloudwatchgroup}
+    MONGO_DB_IMAGE=${MONGO_DB_IMAGE:-mongodbimage}
+    POST_SERVICE_IMAGE=${POST_SERVICE_IMAGE:-postserviceimage}
+    FRONT_END_IMAGE=${FRONT_END_IMAGE:-frontendimage}
+    KEY_STORE_PASSWORD=${KEY_STORE_PASSWORD:-password}
+    KEY_PASSWORD=${KEY_PASSWORD:-password}
+    JWT_SECRET=${JWT_SECRET:-jwtsecret}
+    DOCKER_HUB_SECRET_ARN=${DOCKER_HUB_SECRET_ARN:-dockerhubsecret}
+    EXECUTION_ROLE_ARN=${EXECUTION_ROLE_ARN:-executionrole}
+    MONGO_MEMORY=${MONGO_MEMORY:-1024}
+    POST_SERVICE_MEMORY=${POST_SERVICE_MEMORY:-1024}
+    FRONT_END_MEMORY=${FRONT_END_MEMORY:-512}
+
+    aws cloudformation $1-stack \
+        --stack-name dataglitter-app \
+        --template-body file://${PWD}/cf/task-definition.yaml \
+        --parameters \
+            ParameterKey=ECSCluster,ParameterValue=$ECS_CLUSTER \
+            ParameterKey=CloudwatchLogsGroup,ParameterValue=$CLOUDWATCH_LOG_GROUP \
+            ParameterKey=MongoDbImage,ParameterValue=$MONGO_DB_IMAGE \
+            ParameterKey=PostServiceImage,ParameterValue=$POST_SERVICE_IMAGE \
+            ParameterKey=FrontEndImage,ParameterValue=$FRONT_END_IMAGE \
+            ParameterKey=KeyStorePassword,ParameterValue=$KEY_STORE_PASSWORD \
+            ParameterKey=KeyPassword,ParameterValue=$KEY_PASSWORD \
+            ParameterKey=JwtSecret,ParameterValue=$JWT_SECRET \
+            ParameterKey=DockerHubSecretARN,ParameterValue=$DOCKER_HUB_SECRET_ARN \
+            ParameterKey=ExecutionRoleARN,ParameterValue=$EXECUTION_ROLE_ARN \
+            ParameterKey=MongoMemory,ParameterValue=$MONGO_MEMORY \
+            ParameterKey=PostServiceMemory,ParameterValue=$POST_SERVICE_MEMORY \
+            ParameterKey=FrontEndMemory,ParameterValue=$FRONT_END_MEMORY \
+        --profile prod
+else
+    echo "[ERROR] Expected either 'create' or 'update' for stack command execution."
+    exit 1
+fi
+
+echo "[INFO] Sucessfully finished stack $1"
