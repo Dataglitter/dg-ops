@@ -8,6 +8,6 @@ fi
 
 aws cloudformation delete-stack \
     --stack-name $1 \
-    --profile prod
+    --profile dataglitter
 
 echo "[INFO] Stack sucessfully deleted '$1'"

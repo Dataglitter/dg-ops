@@ -14,7 +14,7 @@ if [ "$1" == 'create' ] || [ "$1" == 'update' ] ; then
         --stack-name dataglitter-assets \
         --template-body file://${PWD}/cf/assets-bucket-setup.yaml \
         --parameters ParameterKey=AssetsBucketName,ParameterValue=$DATAGLITTER_ASSETS_S3_BUCKET \
-        --profile prod
+        --profile dataglitter
 else
     echo "[ERROR] Expected either 'create' or 'update' for stack command execution."
     exit 1

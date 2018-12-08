@@ -30,7 +30,7 @@ if [ "$1" == 'create' ] || [ "$1" == 'update' ] ; then
             ParameterKey=AssetsS3Bucket,ParameterValue=$DATAGLITTER_ASSETS_S3_BUCKET \
             ParameterKey=DockerHubSecretARN,ParameterValue=$DOCKER_HUB_SECRET_ARN \
         --capabilities CAPABILITY_IAM \
-        --profile prod
+        --profile dataglitter
 else
     echo "[ERROR] Expected either 'create' or 'update' for stack command execution."
     exit 1

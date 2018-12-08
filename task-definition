@@ -39,7 +39,7 @@ if [ "$1" == 'create' ] || [ "$1" == 'update' ] ; then
             ParameterKey=MongoMemory,ParameterValue=$MONGO_MEMORY \
             ParameterKey=PostServiceMemory,ParameterValue=$POST_SERVICE_MEMORY \
             ParameterKey=FrontEndMemory,ParameterValue=$FRONT_END_MEMORY \
-        --profile prod
+        --profile dataglitter
 else
     echo "[ERROR] Expected either 'create' or 'update' for stack command execution."
     exit 1
